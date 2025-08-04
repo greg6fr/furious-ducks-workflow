@@ -1,0 +1,8 @@
+pipeline {
+  agent any
+  stages {
+    stage("Deploy") {
+      steps { sh "docker stack deploy -c database/mongodb/docker-compose.yml mongodb" }
+    }
+  }
+}

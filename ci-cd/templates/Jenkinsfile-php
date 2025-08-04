@@ -1,0 +1,8 @@
+pipeline {
+  agent any
+  stages {
+    stage("Build") { steps { sh "docker build -t php-app ." } }
+    stage("Test") { steps { sh "phpunit tests" } }
+    stage("Deploy") { steps { sh "docker stack deploy -c docker-compose.yml php_app" } }
+  }
+}

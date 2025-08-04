@@ -1,0 +1,17 @@
+---
+- name: Pull Jenkins image
+  docker_image:
+    name: jenkins/jenkins
+    tag: lts
+    source: pull
+
+- name: Run Jenkins container
+  docker_container:
+    name: jenkins
+    image: jenkins/jenkins:lts
+    state: started
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home

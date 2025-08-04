@@ -1,0 +1,5 @@
+{
+  "name": "angular-ssr",
+  "version": "1.0.0",
+  "scripts": { "build:ssr": "ng build && ng run angular-ssr:server", "serve:ssr": "node dist/server/main.js" }
+}

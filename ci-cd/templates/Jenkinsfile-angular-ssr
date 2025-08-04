@@ -1,0 +1,14 @@
+pipeline {
+  agent any
+  stages {
+    stage("Build") {
+      steps { sh "docker build -t angular-ssr ./apps/angular-ssr" }
+    }
+    stage("Test") {
+      steps { sh "npm test --prefix ./apps/angular-ssr" }
+    }
+    stage("Deploy") {
+      steps { sh "docker stack deploy -c deployments/prod/docker-compose.yml angular_ssr" }
+    }
+  }
+}

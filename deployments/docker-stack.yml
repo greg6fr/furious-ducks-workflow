@@ -1,0 +1,41 @@
+version: "3.8"
+services:
+  angular-ssr:
+    image: angular-ssr:latest
+    build:
+      context: ./apps/angular-ssr
+    ports:
+      - "4000:4000"
+    depends_on:
+      - node-api
+    networks:
+      - tiptop-network
+
+  node-api:
+    image: node-api:latest
+    build:
+      context: ./apps/node-api
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/tiptopdb
+    depends_on:
+      - mongodb
+    networks:
+      - tiptop-network
+
+  mongodb:
+    image: mongo:5
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - tiptop-network
+
+networks:
+  tiptop-network:
+    driver: overlay
+
+volumes:
+  mongo_data:

@@ -1,0 +1,60 @@
+pipeline {
+  agent any
+  environment {
+    REGISTRY = "gitlab.com:5050/furiousducks"
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: 'develop', url: 'https://gitlab.com/furiousducks/the-tip-top.git'
+      }
+    }
+    stage('Build Angular SSR') {
+      steps {
+        sh 'docker build -t $REGISTRY/angular-ssr:latest ./apps/angular-ssr'
+      }
+    }
+    stage('Build Node API') {
+      steps {
+        sh 'docker build -t $REGISTRY/node-api:latest ./apps/node-api'
+      }
+    }
+    stage('Push Images') {
+      steps {
+        sh 'docker push $REGISTRY/angular-ssr:latest'
+        sh 'docker push $REGISTRY/node-api:latest'
+      }
+    }
+    stage('Deploy to Dev') {
+      steps {
+        sh 'docker stack deploy -c deployments/dev/docker-compose.yml tiptop_dev'
+      }
+    }
+    stage('Run Tests') {
+      steps {
+        sh 'npm test --prefix ./apps/angular-ssr'
+        sh 'npm test --prefix ./apps/node-api'
+      }
+    }
+    stage('Deploy to QA') {
+      steps {
+        input message: "Approve deployment to QA?", ok: "Deploy"
+        sh 'docker stack deploy -c deployments/qa/docker-compose.yml tiptop_qa'
+      }
+    }
+    stage('Deploy to Production') {
+      steps {
+        input message: "Approve deployment to Production?", ok: "Deploy"
+        sh 'docker stack deploy -c deployments/prod/docker-compose.yml tiptop_prod'
+      }
+    }
+  }
+  post {
+    success {
+      echo 'Deployment pipeline executed successfully.'
+    }
+    failure {
+      echo 'Pipeline failed!'
+    }
+  }
+}

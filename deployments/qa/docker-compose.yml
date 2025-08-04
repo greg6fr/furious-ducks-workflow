@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  angular-ssr:
+    image: angular-ssr:qa
+    ports:
+      - "4002:4000"
+  node-api:
+    image: node-api:qa
+    ports:
+      - "3002:3000"
+  mongodb:
+    image: mongo:5
+    ports:
+      - "27019:27017"

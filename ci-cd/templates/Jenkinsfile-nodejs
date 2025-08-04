@@ -1,0 +1,8 @@
+pipeline {
+  agent any
+  stages {
+    stage("Build") { steps { sh "docker build -t node-app ." } }
+    stage("Test") { steps { sh "npm test" } }
+    stage("Deploy") { steps { sh "docker stack deploy -c docker-compose.yml node_app" } }
+  }
+}
