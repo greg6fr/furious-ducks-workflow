@@ -1,0 +1,38 @@
+---
+- name: Test basic connectivity and Docker install only
+  hosts: all
+  become: yes
+  tasks:
+    - name: Test connectivity
+      ping:
+
+    - name: Check system resources
+      shell: |
+        echo "Memory usage:"
+        free -h
+        echo "Disk usage:"
+        df -h /
+        echo "System load:"
+        uptime
+      register: system_resources
+
+    - name: Display system resources
+      debug:
+        var: system_resources.stdout_lines
+
+    - name: Install basic packages
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+        state: present
+
+    - name: Check if Docker is already installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+
+    - name: Display Docker status
+      debug:
+        msg: "Docker status: {{ 'Installed' if docker_check.rc == 0 else 'Not installed' }}"

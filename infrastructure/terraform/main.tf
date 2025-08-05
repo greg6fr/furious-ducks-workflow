@@ -4,10 +4,10 @@ resource "tls_private_key" "furious_ducks_key" {
   rsa_bits  = 4096
 }
 
-# Sauvegarde de la clé privée
+# Sauvegarde de la clé privée dans le répertoire ansible/keys
 resource "local_file" "private_key" {
   content         = tls_private_key.furious_ducks_key.private_key_pem
-  filename        = pathexpand("~/.ssh/mykey.pem")
+  filename        = "../ansible/keys/mykey.pem"
   file_permission = "0600"
 }
 
