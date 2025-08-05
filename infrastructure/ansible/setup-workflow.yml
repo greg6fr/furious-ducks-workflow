@@ -1,0 +1,130 @@
+---
+- name: Install base packages and Docker
+  hosts: all
+  become: yes
+  tasks:
+    - name: Clean up conflicting Docker repositories
+      shell: |
+        rm -f /etc/apt/sources.list.d/docker.list
+        rm -f /etc/apt/sources.list.d/docker.list.save
+        rm -f /usr/share/keyrings/docker-archive-keyring.gpg
+        rm -f /etc/apt/keyrings/docker.gpg
+        apt-get clean
+        apt-get update
+      ignore_errors: yes
+
+    - name: Update and install common tools
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+          - apt-transport-https
+          - ca-certificates
+        state: present
+
+    - name: Remove conflicting Docker sources
+      file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      ignore_errors: yes
+
+    - name: Clean apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 0
+
+    - name: Install Docker using convenience script method
+      shell: |
+        if ! command -v docker &> /dev/null; then
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
+          rm get-docker.sh
+        fi
+      args:
+        creates: /usr/bin/docker
+
+    - name: Install Docker Compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+        update_cache: yes
+      ignore_errors: yes
+
+    - name: Enable Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+- name: Initialize Docker Swarm on CI/CD
+  hosts: ci_cd_server
+  become: yes
+  tasks:
+    - name: Init Docker Swarm if not already initialized
+      shell: docker swarm init || true
+
+    - name: Get Swarm join token
+      shell: docker swarm join-token -q worker
+      register: swarm_token
+
+    - name: Save join token for other hosts
+      set_fact:
+        worker_token: "{{ swarm_token.stdout }}"
+
+- name: Join other servers to Docker Swarm
+  hosts: dev_server, qa_server, prod_server
+  become: yes
+  tasks:
+    - name: Join worker nodes
+      shell: docker swarm join --token {{ hostvars[groups['ci_cd_server'][0]]['worker_token'] }} {{ groups['ci_cd_server'][0] }}:2377
+      args:
+        creates: /var/lib/docker/swarm
+
+- name: Setup Jenkins and GitLab on CI/CD
+  hosts: ci_cd_server
+  become: yes
+  tasks:
+    - name: Install Python Docker SDK
+      apt:
+        name: python3-docker
+        state: present
+
+    - name: Pull Jenkins image
+      community.docker.docker_image:
+        name: jenkins/jenkins
+        tag: lts
+        source: pull
+
+    - name: Run Jenkins container
+      community.docker.docker_container:
+        name: jenkins
+        image: jenkins/jenkins:lts
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:8080"
+          - "50000:50000"
+        volumes:
+          - /var/jenkins_home:/var/jenkins_home
+
+    - name: Pull GitLab CE image
+      community.docker.docker_image:
+        name: gitlab/gitlab-ce
+        tag: latest
+        source: pull
+
+    - name: Run GitLab container
+      community.docker.docker_container:
+        name: gitlab
+        image: gitlab/gitlab-ce:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "80:80"
+          - "443:443"
+          - "2222:22"
+        volumes:
+          - /srv/gitlab/config:/etc/gitlab
+          - /srv/gitlab/logs:/var/log/gitlab
+          - /srv/gitlab/data:/var/opt/gitlab
