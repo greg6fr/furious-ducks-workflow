@@ -122,7 +122,8 @@ locals {
 resource "aws_instance" "servers" {
   for_each               = local.instances
   ami                    = var.ami_id
-  instance_type          = var.instance_type
+  # Use t3.medium for CI/CD server to support GitLab CE (4GB RAM), t2.micro for others
+  instance_type          = each.key == "ci_cd" ? "t3.medium" : var.instance_type
   key_name               = aws_key_pair.furious_ducks_keypair.key_name
   subnet_id              = var.subnet_id != "" ? var.subnet_id : aws_subnet.furious_subnet[0].id
   vpc_security_group_ids = [aws_security_group.common_sg.id]

@@ -136,6 +136,34 @@
         volumes:
           - /var/jenkins_home:/var/jenkins_home
 
-    # GitLab removed due to high resource requirements (4GB+ RAM needed)
-    # t2.micro instances only have 1GB RAM, causing system instability
-    # Use external Git services (GitHub, GitLab.com) or upgrade instance type
+    # Deploy Gitea (Lightweight Git service - much smaller than GitLab CE)
+    - name: Pull Gitea image
+      docker_image:
+        name: gitea/gitea
+        tag: latest
+        source: pull
+
+    - name: Create Gitea data directory
+      file:
+        path: /srv/gitea
+        state: directory
+        owner: 1000
+        group: 1000
+        mode: '0755'
+
+    - name: Run Gitea container
+      docker_container:
+        name: gitea
+        image: gitea/gitea:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "3000:3000"
+          - "2222:22"
+        volumes:
+          - /srv/gitea:/data
+          - /etc/timezone:/etc/timezone:ro
+          - /etc/localtime:/etc/localtime:ro
+        env:
+          USER_UID: "1000"
+          USER_GID: "1000"
