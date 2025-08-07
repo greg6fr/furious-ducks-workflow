@@ -297,8 +297,17 @@ pipeline {
     
     post {
         always {
-            // Archive artifacts
-            archiveArtifacts artifacts: '**/dist/**', allowEmptyArchive: true
+            script {
+                // Archive artifacts if they exist
+                if (fileExists('frontend/dist')) {
+                    archiveArtifacts artifacts: 'frontend/dist/**', allowEmptyArchive: true
+                }
+                if (fileExists('backend/dist')) {
+                    archiveArtifacts artifacts: 'backend/dist/**', allowEmptyArchive: true
+                }
+                
+                echo "🧹 Pipeline completed - cleaning workspace"
+            }
             
             // Clean workspace
             cleanWs()
@@ -306,21 +315,18 @@ pipeline {
         success {
             script {
                 if (env.BRANCH_NAME == 'main') {
-                    slackSend(
-                        channel: '#deployments',
-                        color: 'good',
-                        message: "✅ Production deployment successful! Build #${env.BUILD_NUMBER} - ${env.GIT_COMMIT_SHORT}"
-                    )
+                    echo "✅ Production deployment successful! Build #${env.BUILD_NUMBER} - ${env.GIT_COMMIT_SHORT}"
+                    echo "🚀 Services deployed to production and QA environments"
+                } else {
+                    echo "✅ Build and tests successful! Build #${env.BUILD_NUMBER} - ${env.GIT_COMMIT_SHORT}"
                 }
             }
         }
         failure {
             script {
-                slackSend(
-                    channel: '#alerts',
-                    color: 'danger',
-                    message: "❌ Pipeline failed! Branch: ${env.BRANCH_NAME}, Build #${env.BUILD_NUMBER}"
-                )
+                echo "❌ Pipeline failed! Branch: ${env.BRANCH_NAME}, Build #${env.BUILD_NUMBER}"
+                echo "📋 Check the logs above for detailed error information"
+                echo "🔧 Common issues: missing credentials, network connectivity, Docker daemon"
             }
         }
     }
