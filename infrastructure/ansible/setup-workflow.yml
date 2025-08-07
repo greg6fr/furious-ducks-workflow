@@ -229,23 +229,50 @@
         group: 1000
         mode: '0755'
 
-    - name: Pull Jenkins image
+    - name: Pull Jenkins image with Docker support
       community.docker.docker_image:
         name: jenkins/jenkins
         tag: lts
         source: pull
 
-    - name: Run Jenkins container
+    - name: Run Jenkins container with Docker access
       community.docker.docker_container:
         name: jenkins
         image: jenkins/jenkins:lts
         state: started
         restart_policy: always
+        user: "root"  # Run as root to access Docker socket
         ports:
           - "8080:8080"
           - "50000:50000"
         volumes:
           - /var/jenkins_home:/var/jenkins_home
+          - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket
+        env:
+          DOCKER_HOST: "unix:///var/run/docker.sock"
+          JENKINS_OPTS: "--httpPort=8080"
+
+    - name: Install Docker CLI in Jenkins container
+      shell: |
+        docker exec jenkins bash -c '
+        apt-get update &&
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &&
+        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &&
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" > /etc/apt/sources.list.d/docker.list &&
+        apt-get update &&
+        apt-get install -y docker-ce-cli
+        ' || echo "Docker CLI installation completed or already installed"
+      ignore_errors: yes
+
+    - name: Verify Docker access in Jenkins
+      shell: docker exec jenkins docker --version
+      register: jenkins_docker_version
+      ignore_errors: yes
+
+    - name: Display Jenkins Docker status
+      debug:
+        msg: "Jenkins Docker CLI: {{ jenkins_docker_version.stdout if jenkins_docker_version.stdout is defined else 'Installation needed' }}"
+      when: jenkins_docker_version is defined
 
     # Deploy Gitea (Lightweight Git service - much smaller than GitLab CE)
     - name: Pull Gitea image
