@@ -67,8 +67,22 @@
   hosts: ci_cd_server
   become: yes
   tasks:
-    - name: Init Docker Swarm if not already initialized
-      shell: docker swarm init || true
+    - name: Copy docker-swarm-init.sh script to CI/CD server
+      copy:
+        src: ../docker-swarm-init.sh
+        dest: /tmp/docker-swarm-init.sh
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Execute docker-swarm-init.sh script
+      shell: /tmp/docker-swarm-init.sh
+      register: swarm_init_result
+      ignore_errors: yes
+
+    - name: Display Swarm initialization result
+      debug:
+        var: swarm_init_result.stdout_lines
 
     - name: Get Swarm join token
       shell: docker swarm join-token -q worker
@@ -81,11 +95,61 @@
 - name: Join other servers to Docker Swarm
   hosts: dev_server, qa_server, prod_server
   become: yes
+  tags:
+    - swarm-join
+    - docker-swarm
   tasks:
-    - name: Join worker nodes
-      shell: docker swarm join --token {{ hostvars[groups['ci_cd_server'][0]]['worker_token'] }} {{ groups['ci_cd_server'][0] }}:2377
-      args:
-        creates: /var/lib/docker/swarm
+    - name: Get Swarm join token from manager
+      shell: docker swarm join-token -q worker
+      register: swarm_token
+      delegate_to: "{{ groups['ci_cd_server'][0] }}"
+      run_once: true
+
+    - name: Get manager private IP address
+      set_fact:
+        manager_private_ip: "{{ hostvars[groups['ci_cd_server'][0]]['ansible_default_ipv4']['address'] }}"
+      run_once: true
+
+    - name: Copy join-swarm script to worker nodes
+      copy:
+        src: scripts/join-swarm.sh
+        dest: /tmp/join-swarm.sh
+        mode: '0755'
+
+    - name: Determine node type based on inventory group
+      set_fact:
+        node_type: |
+          {% if inventory_hostname in groups['dev_server'] %}
+          dev
+          {% elif inventory_hostname in groups['qa_server'] %}
+          qa
+          {% elif inventory_hostname in groups['prod_server'] %}
+          prod
+          {% else %}
+          worker
+          {% endif %}
+
+    - name: Execute join-swarm script on worker nodes
+      shell: /tmp/join-swarm.sh "{{ swarm_token.stdout }}" "{{ manager_private_ip }}" "{{ node_type | trim }}"
+      register: join_result
+      ignore_errors: yes
+
+    - name: Display join result for each worker
+      debug:
+        msg: "{{ inventory_hostname }}: {{ join_result.stdout_lines }}"
+      when: join_result is defined
+
+    - name: Verify swarm membership from manager
+      shell: docker node ls
+      register: node_list
+      delegate_to: "{{ groups['ci_cd_server'][0] }}"
+      run_once: true
+
+    - name: Display current swarm nodes
+      debug:
+        var: node_list.stdout_lines
+      when: node_list is defined and node_list.stdout_lines is defined
+      run_once: true
 
 - name: Setup Jenkins and GitLab on CI/CD
   hosts: ci_cd_server
