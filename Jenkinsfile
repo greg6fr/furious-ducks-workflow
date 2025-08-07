@@ -17,24 +17,23 @@ pipeline {
         ANGULAR_IMAGE = "${DOCKERHUB_USERNAME}/furious-ducks-frontend"
         NODEJS_IMAGE = "${DOCKERHUB_USERNAME}/furious-ducks-backend"
         
-        // Docker Swarm nodes (update with current IPs)
-        PROD_NODE = "52.47.127.185"
-        QA_NODE = "15.236.42.10"
-        DEV_NODE = "13.36.173.96"
-        CI_CD_NODE = "51.44.221.192"
+        // Docker Swarm nodes (current IPs)
+        PROD_NODE = "15.236.142.213"
+        QA_NODE = "15.237.255.213"
+        DEV_NODE = "13.38.79.229"
+        CI_CD_NODE = "13.37.223.20"
     }
     
     stages {
         stage('Checkout & Setup') {
             steps {
+                // Checkout first to establish Git context
+                checkout scm
+                
                 script {
                     echo "🚀 Starting CI/CD Pipeline for ${env.BRANCH_NAME}"
-                    echo "📦 Build #${env.BUILD_NUMBER} - Commit: ${GIT_COMMIT_SHORT}"
+                    echo "📦 Build #${env.BUILD_NUMBER} - Commit: ${env.GIT_COMMIT[0..7]}"
                 }
-                
-                // Clean workspace
-                cleanWs()
-                checkout scm
                 
                 // Install Node.js using NodeJS plugin or Docker
                 script {
