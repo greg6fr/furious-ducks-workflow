@@ -1,0 +1,27 @@
+{
+  "name": "furious-ducks-workflow",
+  "version": "1.0.0",
+  "description": "CI/CD Pipeline for Angular + Node.js + MongoDB stack",
+  "scripts": {
+    "test:integration": "cypress run --config-file cypress.config.integration.js",
+    "test:api": "newman run postman-collection.json --environment postman-environment.json",
+    "test:performance": "lighthouse-ci autorun",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "deploy:prod": "docker stack deploy -c docker-compose.prod.yml furious-ducks-prod",
+    "deploy:qa": "docker stack deploy -c docker-compose.qa.yml furious-ducks-qa",
+    "setup:swarm-labels": "node scripts/setup-swarm-labels.js"
+  },
+  "devDependencies": {
+    "cypress": "^13.0.0",
+    "newman": "^6.0.0",
+    "@lhci/cli": "^0.12.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
