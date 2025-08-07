@@ -19,9 +19,9 @@ pipeline {
         MONGO_IMAGE = "mongo:7.0"
         
         // Docker Swarm nodes
-        PROD_NODE = "52.47.133.246"
-        QA_NODE = "51.44.86.0"
-        DEV_NODE = "51.44.220.111"
+        PROD_NODE = "15.236.142.213"
+        QA_NODE = "15.237.255.213"
+        DEV_NODE = "13.38.79.229"
     }
     
     stages {
