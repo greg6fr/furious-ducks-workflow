@@ -21,7 +21,54 @@
           - git
           - apt-transport-https
           - ca-certificates
+          - gnupg
+          - lsb-release
         state: present
+
+    - name: Add NodeSource GPG key
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+        state: present
+      tags:
+        - nodejs
+        - node-setup
+
+    - name: Add NodeSource repository
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/node_18.x {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: yes
+      tags:
+        - nodejs
+        - node-setup
+
+    - name: Install Node.js and npm
+      apt:
+        name:
+          - nodejs
+        state: present
+        update_cache: yes
+      tags:
+        - nodejs
+        - node-setup
+
+    - name: Verify Node.js installation
+      shell: |
+        node --version
+        npm --version
+      register: nodejs_version
+      ignore_errors: yes
+      tags:
+        - nodejs
+        - node-setup
+
+    - name: Display Node.js version
+      debug:
+        msg: "Node.js installed: {{ nodejs_version.stdout_lines }}"
+      when: nodejs_version.stdout_lines is defined
+      tags:
+        - nodejs
+        - node-setup
 
     - name: Remove conflicting Docker sources
       file:
