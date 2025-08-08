@@ -77,7 +77,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # Angular Frontend
+  # Frontend Server
   frontend:
     image: ${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}
     environment:
@@ -86,7 +86,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "4200:80"
+      - "4000:4000"
     networks:
       - furious-ducks-network
     deploy:

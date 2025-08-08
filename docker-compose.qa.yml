@@ -88,7 +88,7 @@ services:
     depends_on:
       - backend-qa
     ports:
-      - "4200:80"
+      - "4000:4000"
     networks:
       - furious-ducks-qa-network
     deploy:

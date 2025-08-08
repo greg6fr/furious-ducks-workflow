@@ -103,9 +103,6 @@ pipeline {
         }
         
         stage('Push to Docker Hub') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "📤 Pushing images to Docker Hub..."
@@ -127,9 +124,6 @@ pipeline {
         }
         
         stage('Deploy to Production') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "🚀 Deploying to production environment..."
@@ -152,9 +146,6 @@ pipeline {
         }
         
         stage('Deploy to QA') {
-            when {
-                branch 'main'
-            }
             steps {
                 script {
                     echo "🧪 Deploying to QA environment..."
