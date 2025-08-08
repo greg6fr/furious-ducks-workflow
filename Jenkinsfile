@@ -18,10 +18,10 @@ pipeline {
         NODEJS_IMAGE = "${DOCKERHUB_USERNAME}/furious-ducks-backend"
         
         // Docker Swarm nodes (current IPs)
-        PROD_NODE = "15.236.142.213"
-        QA_NODE = "15.237.255.213"
-        DEV_NODE = "13.38.79.229"
-        CI_CD_NODE = "13.37.223.20"
+        PROD_NODE = "51.44.223.133"
+        QA_NODE = "13.38.45.25"
+        DEV_NODE = "15.237.179.98"
+        CI_CD_NODE = "15.236.225.200"
     }
     
     stages {
@@ -57,29 +57,18 @@ pipeline {
                         script {
                             echo "🔨 Building Angular frontend Docker image..."
                             
-                            // Create a simple Dockerfile for frontend if it doesn't exist
+                            // Check if package-lock.json exists, if not create it
                             sh '''
-                                if [ ! -f "frontend/Dockerfile" ]; then
-                                    mkdir -p frontend
-                                    cat > frontend/Dockerfile << 'EOF'
-FROM node:18-alpine as build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build --prod
-
-FROM nginx:alpine
-COPY --from=build /app/dist/* /usr/share/nginx/html/
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-EOF
+                                cd apps/angular-ssr
+                                if [ ! -f "package-lock.json" ]; then
+                                    echo "📦 Creating package-lock.json for Angular app..."
+                                    npm install
                                 fi
                             '''
                             
                             // Build Docker image
                             sh """
-                                cd frontend
+                                cd apps/angular-ssr
                                 docker build -t ${ANGULAR_IMAGE}:${APP_VERSION} .
                                 docker tag ${ANGULAR_IMAGE}:${APP_VERSION} ${ANGULAR_IMAGE}:latest
                             """
@@ -92,25 +81,18 @@ EOF
                         script {
                             echo "🔨 Building Node.js backend Docker image..."
                             
-                            // Create a simple Dockerfile for backend if it doesn't exist
+                            // Check if package-lock.json exists, if not create it
                             sh '''
-                                if [ ! -f "backend/Dockerfile" ]; then
-                                    mkdir -p backend
-                                    cat > backend/Dockerfile << 'EOF'
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
-EOF
+                                cd apps/node-api
+                                if [ ! -f "package-lock.json" ]; then
+                                    echo "📦 Creating package-lock.json for Node.js API..."
+                                    npm install
                                 fi
                             '''
                             
                             // Build Docker image
                             sh """
-                                cd backend
+                                cd apps/node-api
                                 docker build -t ${NODEJS_IMAGE}:${APP_VERSION} .
                                 docker tag ${NODEJS_IMAGE}:${APP_VERSION} ${NODEJS_IMAGE}:latest
                             """
