@@ -57,7 +57,16 @@ pipeline {
                         script {
                             echo "🔨 Building Angular frontend Docker image..."
                             
-                            // Build Docker image (npm install handled inside Docker)
+                            // Check if package-lock.json exists, if not create it
+                            sh '''
+                                cd apps/angular-ssr
+                                if [ ! -f "package-lock.json" ]; then
+                                    echo "📦 Creating package-lock.json for Angular app..."
+                                    npm install
+                                fi
+                            '''
+                            
+                            // Build Docker image
                             sh """
                                 cd apps/angular-ssr
                                 docker build -t ${ANGULAR_IMAGE}:${APP_VERSION} .
@@ -72,7 +81,16 @@ pipeline {
                         script {
                             echo "🔨 Building Node.js backend Docker image..."
                             
-                            // Build Docker image (npm install handled inside Docker)
+                            // Check if package-lock.json exists, if not create it
+                            sh '''
+                                cd apps/node-api
+                                if [ ! -f "package-lock.json" ]; then
+                                    echo "📦 Creating package-lock.json for Node.js API..."
+                                    npm install
+                                fi
+                            '''
+                            
+                            // Build Docker image
                             sh """
                                 cd apps/node-api
                                 docker build -t ${NODEJS_IMAGE}:${APP_VERSION} .

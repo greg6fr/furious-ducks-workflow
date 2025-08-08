@@ -252,16 +252,18 @@
           DOCKER_HOST: "unix:///var/run/docker.sock"
           JENKINS_OPTS: "--httpPort=8080"
 
-    - name: Install Docker CLI in Jenkins container
+    - name: Install Docker CLI, Git, Node.js and npm in Jenkins container
       shell: |
         docker exec jenkins bash -c '
         apt-get update &&
-        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release &&
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release git &&
         curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &&
         echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" > /etc/apt/sources.list.d/docker.list &&
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&
         apt-get update &&
-        apt-get install -y docker-ce-cli
-        ' || echo "Docker CLI installation completed or already installed"
+        apt-get install -y docker-ce-cli nodejs &&
+        npm --version && node --version && git --version
+        ' || echo "Installation completed or already installed"
       ignore_errors: yes
 
     - name: Verify Docker access in Jenkins
@@ -269,10 +271,22 @@
       register: jenkins_docker_version
       ignore_errors: yes
 
-    - name: Display Jenkins Docker status
+    - name: Verify Git, Node.js and npm in Jenkins
+      shell: |
+        docker exec jenkins bash -c '
+        echo "Git version: $(git --version)"
+        echo "Node.js version: $(node --version)"
+        echo "npm version: $(npm --version)"
+        '
+      register: jenkins_tools_version
+      ignore_errors: yes
+
+    - name: Display Jenkins tools status
       debug:
-        msg: "Jenkins Docker CLI: {{ jenkins_docker_version.stdout if jenkins_docker_version.stdout is defined else 'Installation needed' }}"
-      when: jenkins_docker_version is defined
+        msg: |
+          Jenkins Docker CLI: {{ jenkins_docker_version.stdout if jenkins_docker_version.stdout is defined else 'Installation needed' }}
+          Jenkins Tools: {{ jenkins_tools_version.stdout_lines if jenkins_tools_version.stdout_lines is defined else 'Installation needed' }}
+      when: jenkins_docker_version is defined or jenkins_tools_version is defined
 
     # Deploy Gitea (Lightweight Git service - much smaller than GitLab CE)
     - name: Pull Gitea image
