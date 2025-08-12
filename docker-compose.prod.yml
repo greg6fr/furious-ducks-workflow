@@ -1,34 +1,25 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
   mongodb:
     image: mongo:7.0
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-furious-ducks-prod}
-      MONGO_INITDB_DATABASE: furious_ducks_prod
+      MONGO_INITDB_ROOT_USERNAME: "admin"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD:-furious-ducks-prod}"
+      MONGO_INITDB_DATABASE: "furious_ducks_prod"
     volumes:
       - mongodb_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
-    networks:
-      - furious-ducks-network
+    networks: ["furious-ducks-network"]
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.labels.environment == prod
       resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 512M, cpus: '0.5' }
+        reservations: { memory: 256M, cpus: '0.25' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -36,88 +27,67 @@ services:
       retries: 3
       start_period: 40s
 
-  # Node.js Backend API
   backend:
-    image: ${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}
+    image: "${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}"
     environment:
-      NODE_ENV: production
-      PORT: 3000
-      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-prod}@mongodb:27017/furious_ducks_prod?authSource=admin
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-prod}
-      CORS_ORIGIN: http://${PROD_NODE}:4200
-    depends_on:
-      - mongodb
-    networks:
-      - furious-ducks-network
+      NODE_ENV: "production"
+      PORT: "3000"
+      MONGODB_URI: "mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-prod}@mongodb:27017/furious_ducks_prod?authSource=admin"
+      JWT_SECRET: "${JWT_SECRET:-your-super-secret-jwt-key-prod}"
+      CORS_ORIGIN: "http://${PROD_NODE}:4200"
+    depends_on: ["mongodb"]  # (ignoré par Swarm pour l’ordre)
+    networks: ["furious-ducks-network"]
     deploy:
       replicas: 2
       placement:
         constraints:
           - node.labels.environment == prod
       resources:
-        limits:
-          memory: 256M
-          cpus: '0.3'
-        reservations:
-          memory: 128M
-          cpus: '0.15'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 256M, cpus: '0.3' }
+        reservations: { memory: 128M, cpus: '0.15' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
       update_config:
         parallelism: 1
         delay: 10s
         failure_action: rollback
         order: start-first
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Frontend Server
   frontend:
-    image: ${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}
+    image: "${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}"
     environment:
-      API_URL: http://${PROD_NODE}:3000
-      ENVIRONMENT: production
-    depends_on:
-      - backend
+      API_URL: "http://${PROD_NODE}:3000"
+      ENVIRONMENT: "production"
+    depends_on: ["backend"]
     ports:
       - "4000:4000"
-    networks:
-      - furious-ducks-network
+    networks: ["furious-ducks-network"]
     deploy:
       replicas: 2
       placement:
         constraints:
           - node.labels.environment == prod
       resources:
-        limits:
-          memory: 128M
-          cpus: '0.2'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 128M, cpus: '0.2' }
+        reservations: { memory: 64M, cpus: '0.1' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
       update_config:
         parallelism: 1
         delay: 10s
         failure_action: rollback
         order: start-first
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
-  # Nginx Load Balancer (Optional)
   nginx:
     image: nginx:alpine
     ports:
@@ -125,25 +95,17 @@ services:
       - "3000:3000"
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - furious-ducks-network
+    depends_on: ["frontend","backend"]
+    networks: ["furious-ducks-network"]
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.labels.environment == prod
       resources:
-        limits:
-          memory: 64M
-          cpus: '0.1'
-        reservations:
-          memory: 32M
-          cpus: '0.05'
-      restart_policy:
-        condition: on-failure
+        limits: { memory: 64M, cpus: '0.1' }
+        reservations: { memory: 32M, cpus: '0.05' }
+      restart_policy: { condition: on-failure }
 
 volumes:
   mongodb_data:
