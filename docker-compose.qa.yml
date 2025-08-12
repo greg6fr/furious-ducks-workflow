@@ -47,7 +47,7 @@ services:
       CORS_ORIGIN: http://${QA_NODE}:4200
       # QA specific settings
       LOG_LEVEL: debug
-      ENABLE_DEBUGGING: true
+      ENABLE_DEBUGGING: "true"
       TEST_MODE: "true"
     depends_on:
       - mongodb-qa
