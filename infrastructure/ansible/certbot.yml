@@ -1,0 +1,182 @@
+---
+# Configuration des certificats SSL Let's Encrypt pour tous les serveurs
+
+# CI/CD Server
+- name: Install and configure Let's Encrypt certificates for CI/CD
+  hosts: ci_cd_server
+  become: true
+  vars:
+    certbot_email: "admin@thetiptop-jeu.com"
+    certbot_domains: ["ci.thetiptop-jeu.com"]
+    certbot_redirect: true
+
+  tasks:
+    - name: Install Nginx if not present
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Install Certbot and Nginx plugin
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain/renew certificates for CI/CD
+      ansible.builtin.command:
+        cmd: >
+          certbot --nginx
+          {% for d in certbot_domains %} -d {{ d }} {% endfor %}
+          --non-interactive --agree-tos
+          -m {{ certbot_email }}
+          {% if certbot_redirect %} --redirect {% endif %}
+      args:
+        creates: "/etc/letsencrypt/live/{{ certbot_domains[0] }}/fullchain.pem"
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+# Production Server
+- name: Install and configure Let's Encrypt certificates for Production
+  hosts: prod_server
+  become: true
+  vars:
+    certbot_email: "admin@thetiptop-jeu.com"
+    certbot_domains: ["www.thetiptop-jeu.com", "thetiptop-jeu.com", "api.thetiptop-jeu.com"]
+    certbot_redirect: true
+
+  tasks:
+    - name: Install Nginx if not present
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Install Certbot and Nginx plugin
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain/renew certificates for Production (www + apex + api)
+      ansible.builtin.command:
+        cmd: >
+          certbot --nginx
+          {% for d in certbot_domains %} -d {{ d }} {% endfor %}
+          --non-interactive --agree-tos
+          -m {{ certbot_email }}
+          {% if certbot_redirect %} --redirect {% endif %}
+      args:
+        creates: "/etc/letsencrypt/live/{{ certbot_domains[0] }}/fullchain.pem"
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+# QA Server
+- name: Install and configure Let's Encrypt certificates for QA
+  hosts: qa_server
+  become: true
+  vars:
+    certbot_email: "admin@thetiptop-jeu.com"
+    certbot_domains: ["qa.thetiptop-jeu.com"]
+    certbot_redirect: true
+
+  tasks:
+    - name: Install Nginx if not present
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Install Certbot and Nginx plugin
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain/renew certificates for QA
+      ansible.builtin.command:
+        cmd: >
+          certbot --nginx
+          {% for d in certbot_domains %} -d {{ d }} {% endfor %}
+          --non-interactive --agree-tos
+          -m {{ certbot_email }}
+          {% if certbot_redirect %} --redirect {% endif %}
+      args:
+        creates: "/etc/letsencrypt/live/{{ certbot_domains[0] }}/fullchain.pem"
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+# Dev Server
+- name: Install and configure Let's Encrypt certificates for Dev
+  hosts: dev_server
+  become: true
+  vars:
+    certbot_email: "admin@thetiptop-jeu.com"
+    certbot_domains: ["dev.thetiptop-jeu.com"]
+    certbot_redirect: true
+
+  tasks:
+    - name: Install Nginx if not present
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Install Certbot and Nginx plugin
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain/renew certificates for Dev
+      ansible.builtin.command:
+        cmd: >
+          certbot --nginx
+          {% for d in certbot_domains %} -d {{ d }} {% endfor %}
+          --non-interactive --agree-tos
+          -m {{ certbot_email }}
+          {% if certbot_redirect %} --redirect {% endif %}
+      args:
+        creates: "/etc/letsencrypt/live/{{ certbot_domains[0] }}/fullchain.pem"
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+# Renouvellement automatique sur tous les serveurs
+- name: Setup automatic certificate renewal
+  hosts: all
+  become: true
+  tasks:
+    - name: Test renewal (dry-run) on all servers with certificates
+      ansible.builtin.command: certbot renew --dry-run
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Setup cron job for automatic renewal
+      ansible.builtin.cron:
+        name: "Certbot automatic renewal"
+        job: "/usr/bin/certbot renew --quiet"
+        minute: "0"
+        hour: "12"
+        day: "*"
+        month: "*"
+        weekday: "*"

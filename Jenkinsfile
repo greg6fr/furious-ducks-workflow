@@ -18,10 +18,10 @@ pipeline {
         NODEJS_IMAGE = "${DOCKERHUB_USERNAME}/furious-ducks-backend"
         
         // Docker Swarm nodes (current IPs)
-        PROD_NODE = "51.44.223.133"
-        QA_NODE = "13.38.45.25"
-        DEV_NODE = "15.237.179.98"
-        CI_CD_NODE = "15.236.225.200"
+        PROD_NODE = "13.38.206.31"
+        QA_NODE = "13.37.196.126"
+        DEV_NODE = "15.236.251.19"
+        CI_CD_NODE = "15.236.87.60"
     }
     
     stages {

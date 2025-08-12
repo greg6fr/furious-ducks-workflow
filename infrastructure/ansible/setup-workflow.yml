@@ -1,4 +1,118 @@
 ---
+# Vérification de la présence des outils requis sur tous les serveurs
+- name: Verify required tools on all servers
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if Git is installed
+      command: git --version
+      register: git_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if Node.js is installed
+      command: node --version
+      register: nodejs_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if npm is installed
+      command: npm --version
+      register: npm_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if curl is installed
+      command: curl --version
+      register: curl_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if wget is installed
+      command: wget --version
+      register: wget_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Display tool verification results
+      debug:
+        msg: |
+          Server: {{ inventory_hostname }}
+          Docker: {{ 'INSTALLED' if docker_check.rc == 0 else 'NOT INSTALLED' }} {{ docker_check.stdout.split('\n')[0] if docker_check.rc == 0 else '' }}
+          Git: {{ 'INSTALLED' if git_check.rc == 0 else 'NOT INSTALLED' }} {{ git_check.stdout.split('\n')[0] if git_check.rc == 0 else '' }}
+          Node.js: {{ 'INSTALLED' if nodejs_check.rc == 0 else 'NOT INSTALLED' }} {{ nodejs_check.stdout if nodejs_check.rc == 0 else '' }}
+          npm: {{ 'INSTALLED' if npm_check.rc == 0 else 'NOT INSTALLED' }} {{ npm_check.stdout if npm_check.rc == 0 else '' }}
+          curl: {{ 'INSTALLED' if curl_check.rc == 0 else 'NOT INSTALLED' }} {{ curl_check.stdout.split('\n')[0] if curl_check.rc == 0 else '' }}
+          wget: {{ 'INSTALLED' if wget_check.rc == 0 else 'NOT INSTALLED' }} {{ wget_check.stdout.split('\n')[0] if wget_check.rc == 0 else '' }}
+
+    - name: Create summary of missing tools
+      set_fact:
+        missing_tools: |
+          {% set missing = [] %}
+          {% if docker_check.rc != 0 %}{{ missing.append('docker') }}{% endif %}
+          {% if git_check.rc != 0 %}{{ missing.append('git') }}{% endif %}
+          {% if nodejs_check.rc != 0 %}{{ missing.append('nodejs') }}{% endif %}
+          {% if npm_check.rc != 0 %}{{ missing.append('npm') }}{% endif %}
+          {% if curl_check.rc != 0 %}{{ missing.append('curl') }}{% endif %}
+          {% if wget_check.rc != 0 %}{{ missing.append('wget') }}{% endif %}
+          {{ missing | join(', ') }}
+
+    - name: Display missing tools summary
+      debug:
+        msg: "{{ inventory_hostname }}: Missing tools: {{ missing_tools if missing_tools else 'None - All tools are installed!' }}"
+
+# Vérification spécifique pour le serveur de développement
+- name: Verify development-specific tools on dev server
+  hosts: dev_server
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Check if AWS CLI is installed
+      command: aws --version
+      register: aws_cli_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check if Angular CLI is installed
+      command: ng version
+      register: angular_cli_check
+      ignore_errors: yes
+      changed_when: false
+      become_user: "{{ ansible_user | default('ubuntu') }}"
+
+    - name: Check if Angular CLI is installed globally via npm
+      command: npm list -g @angular/cli
+      register: angular_npm_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Display development tools verification results
+      debug:
+        msg: |
+          Development Server: {{ inventory_hostname }}
+          AWS CLI: {{ 'INSTALLED' if aws_cli_check.rc == 0 else 'NOT INSTALLED' }} {{ aws_cli_check.stdout.split('\n')[0] if aws_cli_check.rc == 0 else '' }}
+          Angular CLI (ng): {{ 'INSTALLED' if angular_cli_check.rc == 0 else 'NOT INSTALLED' }}
+          Angular CLI (npm): {{ 'INSTALLED' if angular_npm_check.rc == 0 else 'NOT INSTALLED' }}
+
+    - name: Create summary of missing development tools
+      set_fact:
+        missing_dev_tools: |
+          {% set missing = [] %}
+          {% if aws_cli_check.rc != 0 %}{{ missing.append('aws-cli') }}{% endif %}
+          {% if angular_cli_check.rc == 0 and angular_npm_check.rc != 0 %}{{ missing.append('angular-cli') }}{% endif %}
+          {{ missing | join(', ') }}
+
+    - name: Display missing development tools summary
+      debug:
+        msg: "{{ inventory_hostname }} (Dev Server): Missing development tools: {{ missing_dev_tools if missing_dev_tools else 'None - All development tools are installed!' }}"
+
 - name: Install base packages and Docker
   hosts: all
   become: yes
@@ -18,6 +132,7 @@
         update_cache: yes
         name:
           - curl
+          - wget
           - git
           - apt-transport-https
           - ca-certificates
@@ -109,6 +224,92 @@
         name: admin
         groups: docker
         append: yes
+
+# Installation des outils spécifiques au serveur de développement (après installation de npm)
+- name: Install development-specific tools on dev server
+  hosts: dev_server
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Install AWS CLI dependencies
+      apt:
+        update_cache: yes
+        name:
+          - unzip
+          - python3-pip
+        state: present
+
+    - name: Check if AWS CLI is already installed
+      command: aws --version
+      register: aws_cli_current_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+        mode: '0644'
+      when: aws_cli_current_check.rc != 0
+
+    - name: Extract AWS CLI v2
+      unarchive:
+        src: "/tmp/awscliv2.zip"
+        dest: "/tmp"
+        remote_src: yes
+      when: aws_cli_current_check.rc != 0
+
+    - name: Install AWS CLI v2
+      command: /tmp/aws/install
+      when: aws_cli_current_check.rc != 0
+      ignore_errors: yes
+
+    - name: Clean up AWS CLI installation files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/awscliv2.zip"
+        - "/tmp/aws"
+      when: aws_cli_current_check.rc != 0
+
+    - name: Verify npm is available
+      shell: |
+        export PATH="/usr/bin:$PATH"
+        which npm && npm --version
+      register: npm_path_check
+      ignore_errors: yes
+
+    - name: Install Angular CLI globally via npm
+      shell: |
+        export PATH="/usr/bin:$PATH"
+        npm install -g @angular/cli
+      environment:
+        PATH: "/usr/bin:{{ ansible_env.PATH }}"
+      when: npm_path_check.rc == 0
+
+    - name: Verify AWS CLI installation
+      command: aws --version
+      register: aws_cli_verify
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Verify Angular CLI installation
+      shell: |
+        export PATH="/usr/bin:$PATH"
+        ng version
+      environment:
+        PATH: "/usr/bin:{{ ansible_env.PATH }}"
+      register: angular_cli_verify
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Display installation verification results
+      debug:
+        msg: |
+          Development tools installation verification:
+          AWS CLI: {{ 'SUCCESS' if aws_cli_verify.rc == 0 else 'FAILED' }} {{ aws_cli_verify.stdout.split('\n')[0] if aws_cli_verify.rc == 0 else '' }}
+          Angular CLI: {{ 'SUCCESS' if angular_cli_verify.rc == 0 else 'FAILED' }}
 
 - name: Initialize Docker Swarm on CI/CD
   hosts: ci_cd_server
@@ -252,17 +453,21 @@
           DOCKER_HOST: "unix:///var/run/docker.sock"
           JENKINS_OPTS: "--httpPort=8080"
 
-    - name: Install Docker CLI, Git, Node.js and npm in Jenkins container
+    - name: Install Docker CLI, Git, Node.js, npm and AWS CLI in Jenkins container
       shell: |
         docker exec jenkins bash -c '
         apt-get update &&
-        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release git &&
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release git unzip &&
         curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg &&
         echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" > /etc/apt/sources.list.d/docker.list &&
         curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&
         apt-get update &&
         apt-get install -y docker-ce-cli nodejs &&
-        npm --version && node --version && git --version
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" &&
+        unzip awscliv2.zip &&
+        ./aws/install &&
+        rm -rf awscliv2.zip aws/ &&
+        npm --version && node --version && git --version && aws --version
         ' || echo "Installation completed or already installed"
       ignore_errors: yes
 
@@ -271,12 +476,13 @@
       register: jenkins_docker_version
       ignore_errors: yes
 
-    - name: Verify Git, Node.js and npm in Jenkins
+    - name: Verify Git, Node.js, npm and AWS CLI in Jenkins
       shell: |
         docker exec jenkins bash -c '
         echo "Git version: $(git --version)"
         echo "Node.js version: $(node --version)"
         echo "npm version: $(npm --version)"
+        echo "AWS CLI version: $(aws --version)"
         '
       register: jenkins_tools_version
       ignore_errors: yes
