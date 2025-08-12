@@ -48,7 +48,7 @@ services:
       # QA specific settings
       LOG_LEVEL: debug
       ENABLE_DEBUGGING: true
-      TEST_MODE: true
+      TEST_MODE: "true"
     depends_on:
       - mongodb-qa
     networks:
