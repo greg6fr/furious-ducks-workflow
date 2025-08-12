@@ -123,46 +123,58 @@ pipeline {
             }
         }
         
-        stage('Deploy to Production') {
+        stage('Deploy Based on Branch') {
             steps {
                 script {
-                    echo "🚀 Deploying to production environment..."
+                    def branchName = env.BRANCH_NAME ?: 'main'
+                    echo "🔍 Current branch: ${branchName}"
                     
-                    // Deploy to Docker Swarm
-                    sh """
-                        # Create or update Docker stack
-                        docker stack deploy -c docker-compose.prod.yml furious-ducks-prod || echo "Stack deployment initiated"
+                    if (branchName == 'main') {
+                        echo "🚀 Deploying to PRODUCTION server: ${env.PROD_NODE}"
                         
-                        # Wait for services to be ready
-                        sleep 30
+                        // Deploy to Production server
+                        sh """
+                            # Deploy to production server
+                            echo "Deploying to production server: ${env.PROD_NODE}"
+                            
+                            # Create or update Docker stack on production
+                            docker stack deploy -c docker-compose.prod.yml furious-ducks-prod || echo "Production stack deployment initiated"
+                            
+                            # Wait for services to be ready
+                            sleep 30
+                            
+                            # Check service status
+                            docker service ls | grep furious-ducks || echo "Production services starting..."
+                        """
                         
-                        # Check service status
-                        docker service ls | grep furious-ducks || echo "Services starting..."
-                    """
-                    
-                    echo "✅ Production deployment completed!"
-                }
-            }
-        }
-        
-        stage('Deploy to QA') {
-            steps {
-                script {
-                    echo "🧪 Deploying to QA environment..."
-                    
-                    // Deploy to QA
-                    sh """
-                        # Create or update QA stack
-                        docker stack deploy -c docker-compose.qa.yml furious-ducks-qa || echo "QA Stack deployment initiated"
+                        echo "✅ Production deployment completed on ${env.PROD_NODE}!"
                         
-                        # Wait for services to be ready
-                        sleep 20
+                    } else if (branchName == 'develop') {
+                        echo "🧪 Deploying to QA server: ${env.QA_NODE}"
                         
-                        # Check QA service status
-                        docker service ls | grep furious-ducks-qa || echo "QA Services starting..."
-                    """
-                    
-                    echo "✅ QA deployment completed!"
+                        // Deploy to QA server
+                        sh """
+                            # Deploy to QA server
+                            echo "Deploying to QA server: ${env.QA_NODE}"
+                            
+                            # Create or update QA stack
+                            docker stack deploy -c docker-compose.qa.yml furious-ducks-qa || echo "QA stack deployment initiated"
+                            
+                            # Wait for services to be ready
+                            sleep 20
+                            
+                            # Check QA service status
+                            docker service ls | grep furious-ducks-qa || echo "QA services starting..."
+                        """
+                        
+                        echo "✅ QA deployment completed on ${env.QA_NODE}!"
+                        
+                    } else {
+                        echo "ℹ️ Branch '${branchName}' - No deployment configured"
+                        echo "Only 'main' and 'develop' branches trigger deployments"
+                        echo "- main branch → Production server (${env.PROD_NODE})"
+                        echo "- develop branch → QA server (${env.QA_NODE})"
+                    }
                 }
             }
         }
