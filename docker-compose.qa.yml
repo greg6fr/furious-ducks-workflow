@@ -83,7 +83,7 @@ services:
       API_URL: http://${QA_NODE}:3000
       ENVIRONMENT: qa
       # QA specific settings
-      DEBUG_MODE: true
+      DEBUG_MODE: "true"
       ENABLE_TESTING_TOOLS: true
     depends_on:
       - backend-qa
