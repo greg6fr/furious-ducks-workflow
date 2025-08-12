@@ -84,7 +84,7 @@ services:
       ENVIRONMENT: qa
       # QA specific settings
       DEBUG_MODE: "true"
-      ENABLE_TESTING_TOOLS: true
+      ENABLE_TESTING_TOOLS: "true"
     depends_on:
       - backend-qa
     ports:
