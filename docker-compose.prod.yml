@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # MongoDB Database for Production
   mongodb:
     image: mongo:7.0
     environment:
@@ -10,7 +11,8 @@ services:
     volumes:
       - mongodb_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
-    networks: ["furious-ducks-network"]
+    networks:
+      - furious-ducks-network
     deploy:
       replicas: 1
       placement:
@@ -27,6 +29,7 @@ services:
       retries: 3
       start_period: 40s
 
+  # Node.js Backend API for Production
   backend:
     image: "${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}"
     environment:
@@ -34,8 +37,8 @@ services:
       PORT: "3000"
       MONGODB_URI: "mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-prod}@mongodb:27017/furious_ducks_prod?authSource=admin"
       JWT_SECRET: "${JWT_SECRET:-your-super-secret-jwt-key-prod}"
-      CORS_ORIGIN: "http://${PROD_NODE}:4200"
-    depends_on: ["mongodb"]  # (ignoré par Swarm pour l’ordre)
+      CORS_ORIGIN: "http://${PROD_NODE}:4000"
+    depends_on: ["mongodb"]
     networks: ["furious-ducks-network"]
     deploy:
       replicas: 2
@@ -58,6 +61,7 @@ services:
       retries: 3
       start_period: 40s
 
+  # Angular SSR Frontend for Production
   frontend:
     image: "${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}"
     environment:
@@ -88,6 +92,7 @@ services:
       retries: 3
       start_period: 30s
 
+  # Nginx Load Balancer for Production
   nginx:
     image: nginx:alpine
     ports:
@@ -95,7 +100,7 @@ services:
       - "3000:3000"
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-    depends_on: ["frontend","backend"]
+    depends_on: ["frontend", "backend"]
     networks: ["furious-ducks-network"]
     deploy:
       replicas: 1

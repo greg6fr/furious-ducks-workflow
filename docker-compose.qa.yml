@@ -5,9 +5,9 @@ services:
   mongodb-qa:
     image: mongo:7.0
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-furious-ducks-qa}
-      MONGO_INITDB_DATABASE: furious_ducks_qa
+      MONGO_INITDB_ROOT_USERNAME: "admin"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD:-furious-ducks-qa}"
+      MONGO_INITDB_DATABASE: "furious_ducks_qa"
     volumes:
       - mongodb_qa_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
@@ -19,16 +19,9 @@ services:
         constraints:
           - node.labels.environment == qa
       resources:
-        limits:
-          memory: 256M
-          cpus: '0.3'
-        reservations:
-          memory: 128M
-          cpus: '0.15'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 256M, cpus: '0.3' }
+        reservations: { memory: 128M, cpus: '0.15' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -38,128 +31,103 @@ services:
 
   # Node.js Backend API for QA
   backend-qa:
-    image: ${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}
+    image: "${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}"
     environment:
-      NODE_ENV: qa
-      PORT: 3000
-      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-qa}@mongodb-qa:27017/furious_ducks_qa?authSource=admin
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-qa}
-      CORS_ORIGIN: http://${QA_NODE}:4200
+      NODE_ENV: "qa"
+      PORT: "3000"
+      MONGODB_URI: "mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-qa}@mongodb-qa:27017/furious_ducks_qa?authSource=admin"
+      JWT_SECRET: "${JWT_SECRET:-your-super-secret-jwt-key-qa}"
+      CORS_ORIGIN: "http://${QA_NODE}:4001"
       # QA specific settings
-      LOG_LEVEL: debug
+      LOG_LEVEL: "debug"
       ENABLE_DEBUGGING: "true"
       TEST_MODE: "true"
-    depends_on:
-      - mongodb-qa
-    networks:
-      - furious-ducks-qa-network
+    depends_on: ["mongodb-qa"]
+    networks: ["furious-ducks-qa-network"]
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.labels.environment == qa
       resources:
-        limits:
-          memory: 256M
-          cpus: '0.3'
-        reservations:
-          memory: 128M
-          cpus: '0.15'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 128M, cpus: '0.2' }
+        reservations: { memory: 64M, cpus: '0.1' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Angular Frontend for QA
+  # Angular SSR Frontend for QA
   frontend-qa:
-    image: ${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}
+    image: "${DOCKERHUB_USERNAME}/furious-ducks-frontend:${APP_VERSION}"
     environment:
-      API_URL: http://${QA_NODE}:3000
-      ENVIRONMENT: qa
+      API_URL: "http://${QA_NODE}:3001"
+      ENVIRONMENT: "qa"
       # QA specific settings
       DEBUG_MODE: "true"
       ENABLE_TESTING_TOOLS: "true"
-    depends_on:
-      - backend-qa
+    depends_on: ["backend-qa"]
     ports:
-      - "4001:4000"
-    networks:
-      - furious-ducks-qa-network
+      - "4001:4000"  # Port différent pour éviter conflit avec prod
+    networks: ["furious-ducks-qa-network"]
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.labels.environment == qa
       resources:
-        limits:
-          memory: 128M
-          cpus: '0.2'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        limits: { memory: 128M, cpus: '0.2' }
+        reservations: { memory: 64M, cpus: '0.1' }
+      restart_policy: { condition: on-failure, delay: 5s, max_attempts: 3 }
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
-  # Test Database Seeder (QA only)
-  db-seeder:
-    image: ${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}
-    environment:
-      NODE_ENV: qa
-      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-qa}@mongodb-qa:27017/furious_ducks_qa?authSource=admin
-    depends_on:
-      - mongodb-qa
-    networks:
-      - furious-ducks-qa-network
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.environment == qa
-      restart_policy:
-        condition: none
-    command: ["npm", "run", "seed:qa"]
-
-  # Nginx for QA (with testing endpoints)
+  # Nginx Load Balancer for QA
   nginx-qa:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "3000:3000"
+      - "8080:80"   # Port différent pour éviter conflit avec prod
+      - "3001:3000" # Port différent pour éviter conflit avec prod
     volumes:
       - ./nginx.qa.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend-qa
-      - backend-qa
-    networks:
-      - furious-ducks-qa-network
+    depends_on: ["frontend-qa", "backend-qa"]
+    networks: ["furious-ducks-qa-network"]
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.labels.environment == qa
       resources:
-        limits:
-          memory: 64M
-          cpus: '0.1'
-        reservations:
-          memory: 32M
-          cpus: '0.05'
-      restart_policy:
-        condition: on-failure
+        limits: { memory: 64M, cpus: '0.1' }
+        reservations: { memory: 32M, cpus: '0.05' }
+      restart_policy: { condition: on-failure }
+
+  # Test Database Seeder (QA only)
+  db-seeder:
+    image: "${DOCKERHUB_USERNAME}/furious-ducks-backend:${APP_VERSION}"
+    environment:
+      NODE_ENV: "qa"
+      MONGODB_URI: "mongodb://admin:${MONGO_ROOT_PASSWORD:-furious-ducks-qa}@mongodb-qa:27017/furious_ducks_qa?authSource=admin"
+      SEED_DATA: "true"
+    depends_on: ["mongodb-qa"]
+    networks: ["furious-ducks-qa-network"]
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.environment == qa
+      resources:
+        limits: { memory: 64M, cpus: '0.1' }
+        reservations: { memory: 32M, cpus: '0.05' }
+      restart_policy: { condition: on-failure }
+    command: ["npm", "run", "seed"]
 
 volumes:
   mongodb_qa_data:
